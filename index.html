@@ -1,0 +1,105 @@
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Fashion App</title>
+</head>
+<body>
+
+<h1>🛍️ Hyperlocal Fashion App</h1>
+
+<h2>Register</h2>
+<input id="name" placeholder="Name"><br>
+<input id="email" placeholder="Email"><br>
+<input id="phone" placeholder="Phone"><br>
+<input id="password" placeholder="Password"><br>
+<input id="address" placeholder="Address"><br>
+<button onclick="register()">Register</button>
+
+<h2>Add Product</h2>
+<input id="pname" placeholder="Product Name"><br>
+<input id="price" placeholder="Price"><br>
+<button onclick="addProduct()">Add Product</button>
+
+<h2>View Products</h2>
+<button onclick="getProducts()">Load Products</button>
+<ul id="productList"></ul>
+
+<script>
+function register() {
+    fetch('http://127.0.0.1:5000/register', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            name: document.getElementById('name').value,
+            email: document.getElementById('email').value,
+            phone: document.getElementById('phone').value,
+            password: document.getElementById('password').value,
+            address: document.getElementById('address').value
+        })
+    })
+    .then(res => res.json())
+    .then(data => alert(data.message));
+}
+
+function addProduct() {
+    fetch('http://127.0.0.1:5000/add_product', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            shop_id: 1,
+            product_name: document.getElementById('pname').value,
+            category: "Clothing",
+            price: document.getElementById('price').value,
+            size: "M",
+            stock: 10,
+            image_url: "shirt.jpg"
+        })
+    })
+    .then(res => res.json())
+    .then(data => alert(data.message));
+}
+
+function getProducts() {
+    fetch('http://127.0.0.1:5000/products')
+    .then(res => res.json())
+    .then(data => {
+        let list = document.getElementById('productList');
+        list.innerHTML = '';
+
+        data.forEach(p => {
+            let li = document.createElement('li');
+
+            li.innerHTML = `
+                ${p.product_name} - ₹${p.price}
+                <button onclick="placeOrder(${p.product_id}, ${p.price})">Order</button>
+            `;
+
+            list.appendChild(li);
+        });
+    });
+}
+</script>
+
+</body>
+</html>

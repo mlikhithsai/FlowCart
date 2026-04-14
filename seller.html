@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Seller Dashboard</title>
+
+    <style>
+        body {
+            font-family: Arial;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        .container {
+            max-width: 700px;
+            margin: auto;
+        }
+
+        .card {
+            background: white;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        input {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+        }
+
+        button {
+            background: green;
+            color: white;
+            border: none;
+            padding: 8px;
+            margin-top: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: darkgreen;
+        }
+
+        .logout {
+            background: red;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+
+<h1>🏪 Seller Dashboard</h1>
+
+<button class="logout" onclick="logout()">Logout</button>
+
+<!-- ========================= -->
+<!-- ADD SHOP (REGISTER) -->
+<!-- ========================= -->
+<div class="card">
+<h2>Register Shop</h2>
+
+<input id="shop_name" placeholder="Shop Name">
+<input id="owner_name" placeholder="Owner Name">
+<input id="phone" placeholder="Phone">
+<input id="address" placeholder="Address">
+<input id="latitude" placeholder="Latitude">
+<input id="longitude" placeholder="Longitude">
+<input id="email" placeholder="Email">
+<input id="password" type="password" placeholder="Password">
+
+<button onclick="addShop()">Register Shop</button>
+
+<p id="shopMsg"></p>
+</div>
+
+<!-- ========================= -->
+<!-- ADD PRODUCT -->
+<!-- ========================= -->
+<div class="card">
+<h2>Add Product</h2>
+
+<input id="product_name" placeholder="Product Name">
+<input id="category" placeholder="Category">
+<input id="price" placeholder="Price">
+<input id="size" placeholder="Size">
+<input id="stock" placeholder="Stock">
+
+<label>Upload Image:</label>
+<input type="file" id="image_file">
+
+<button onclick="addProduct()">Add Product</button>
+
+<p id="productMsg"></p>
+</div>
+
+<!-- ========================= -->
+<!-- VIEW ORDERS -->
+<!-- ========================= -->
+<div class="card">
+<h2>Manage Orders</h2>
+
+<button onclick="getOrders()">Load Orders</button>
+
+<div id="ordersList"></div>
+</div>
+
+</div>
+
+<script>
+
+// =========================
+// CHECK LOGIN
+// =========================
+let shopId = localStorage.getItem("shop_id");
+
+// If not logged in, redirect
+if (!shopId) {
+    alert("Please login first");
+    window.location.href = "seller_login.html";
+}
+
+
+// =========================
+// LOGOUT
+// =========================
+function logout() {
+    localStorage.removeItem("shop_id");
+    window.location.href = "seller_login.html";
+}
+
+
+// =========================
+// REGISTER SHOP
+// =========================
+function addShop() {
+
+    if (!document.getElementById('shop_name').value) {
+        alert("Shop name required");
+        return;
+    }
+
+    fetch('http://127.0.0.1:5000/add_shop', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            shop_name: document.getElementById('shop_name').value,
+            owner_name: document.getElementById('owner_name').value,
+            phone: document.getElementById('phone').value,
+            address: document.getElementById('address').value,
+            latitude: parseFloat(document.getElementById('latitude').value) || 0,
+            longitude: parseFloat(document.getElementById('longitude').value) || 0,
+            email: document.getElementById('email').value,
+            password: document.getElementById('password').value
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        document.getElementById('shopMsg').innerText = data.message;
+    })
+    .catch(err => {
+        alert("Error registering shop");
+        console.error(err);
+    });
+}
+
+
+// =========================
+// ADD PRODUCT
+// =========================
+function addProduct() {
+
+    let file = document.getElementById('image_file').files[0];
+
+    if (!file || !document.getElementById('product_name').value) {
+        alert("Fill all fields and select image");
+        return;
+    }
+
+    let formData = new FormData();
+
+    formData.append("shop_id", shopId);
+    formData.append("product_name", document.getElementById('product_name').value);
+    formData.append("category", document.getElementById('category').value);
+    formData.append("price", parseFloat(document.getElementById('price').value));
+    formData.append("size", document.getElementById('size').value);
+    formData.append("stock", parseInt(document.getElementById('stock').value));
+    formData.append("image", file);
+
+    fetch('http://127.0.0.1:5000/add_product', {
+        method: 'POST',
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+        document.getElementById('productMsg').innerText = data.message;
+    })
+    .catch(err => {
+        alert("Error adding product");
+        console.error(err);
+    });
+}
+
+
+// =========================
+// GET ORDERS
+// =========================
+function getOrders() {
+
+    fetch(`http://127.0.0.1:5000/seller_orders/${shopId}`)
+    .then(res => res.json())
+    .then(data => {
+
+        let list = document.getElementById('ordersList');
+        list.innerHTML = '';
+
+        if (data.length === 0) {
+            list.innerHTML = "No orders";
+            return;
+        }
+
+        data.forEach(o => {
+
+            let div = document.createElement('div');
+            div.className = "card";
+
+            div.innerHTML = `
+                <h3>Order #${o.order_id}</h3>
+                <p>Status: ${o.order_status}</p>
+
+                <button onclick="updateStatus(${o.order_id}, 'ACCEPTED')">Accept</button>
+                <button onclick="updateStatus(${o.order_id}, 'OUT_FOR_DELIVERY')">Ship</button>
+                <button onclick="updateStatus(${o.order_id}, 'DELIVERED')">Delivered</button>
+            `;
+
+            list.appendChild(div);
+        });
+
+    })
+    .catch(err => {
+        alert("Error loading orders");
+        console.error(err);
+    });
+}
+
+
+// =========================
+// UPDATE STATUS
+// =========================
+function updateStatus(order_id, status) {
+
+    fetch('http://127.0.0.1:5000/update_order_status', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            order_id: order_id,
+            status: status
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        alert("Status updated");
+        getOrders();
+    })
+    .catch(err => {
+        alert("Error updating status");
+        console.error(err);
+    });
+}
+
+</script>
+
+</body>
+</html>

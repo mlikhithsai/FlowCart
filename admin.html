@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Dashboard</title>
+
+    <style>
+        body { font-family: Arial; padding: 20px; background:#f5f5f5; }
+        .card {
+            background:white;
+            padding:20px;
+            margin:10px 0;
+            border-radius:10px;
+            box-shadow:0 2px 5px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+
+<h1>📊 Admin Dashboard</h1>
+
+<div class="card" id="totalUsers"></div>
+<div class="card" id="totalOrders"></div>
+<div class="card" id="totalRevenue"></div>
+
+<button onclick="loadAnalytics()">Load Analytics</button>
+
+<script>
+
+function loadAnalytics() {
+    fetch('http://127.0.0.1:5000/admin_analytics')
+    .then(res => res.json())
+    .then(data => {
+
+        document.getElementById('totalUsers').innerText =
+            "Total Users: " + data.users;
+
+        document.getElementById('totalOrders').innerText =
+            "Total Orders: " + data.orders;
+
+        document.getElementById('totalRevenue').innerText =
+            "Revenue: ₹" + data.revenue;
+    });
+}
+
+</script>
+
+</body>
+</html>

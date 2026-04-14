@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Fashion App</title>
+
+    <style>
+        body {
+            font-family: Arial;
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: auto;
+        }
+
+        .card {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        input {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+        }
+
+        img {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            border-radius: 10px;
+        }
+
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        .cod-btn { background: orange; }
+        .logout { background: red; }
+
+        /* Timeline */
+        .timeline {
+            margin-top: 10px;
+            padding-left: 20px;
+            border-left: 3px solid #ccc;
+        }
+
+        .step { margin-bottom: 8px; }
+        .active { color: green; font-weight: bold; }
+
+        /* Progress bar */
+        .progress-container {
+            width: 100%;
+            background: #ddd;
+            border-radius: 10px;
+            margin: 10px 0;
+        }
+
+        .progress-bar {
+            height: 10px;
+            background: green;
+            border-radius: 10px;
+            transition: width 1s;
+        }
+
+        #mapContainer {
+            height: 300px;
+            margin-top: 10px;
+        }
+
+    </style>
+
+    <!-- Google Maps -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY"></script>
+
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>🛍️ Fashion Shopping</h1>
+
+<button class="logout" onclick="logout()">Logout</button>
+
+<!-- ADDRESS -->
+<h2>Delivery Address</h2>
+<input id="address" placeholder="Enter delivery address">
+
+<!-- PRODUCTS -->
+<h2>Products</h2>
+<button onclick="getProducts()">Load Products</button>
+<div id="productList"></div>
+
+<!-- ORDERS -->
+<h2>My Orders</h2>
+<button onclick="getOrders()">Load Orders</button>
+<div id="orderList"></div>
+
+<!-- MAP -->
+<h2>Live Tracking</h2>
+<div id="mapContainer"></div>
+
+</div>
+
+<script>
+
+// =========================
+// LOGIN CHECK
+// =========================
+let userId = localStorage.getItem("user_id");
+if (!userId) {
+    alert("Login first");
+    window.location.href = "login.html";
+}
+
+// product → shop mapping
+let product_id_to_shop_map = {};
+
+// =========================
+// NOTIFICATIONS
+// =========================
+if ("Notification" in window) {
+    Notification.requestPermission();
+}
+
+// =========================
+// PRODUCTS
+// =========================
+function getProducts() {
+    fetch('http://127.0.0.1:5000/products')
+    .then(res => res.json())
+    .then(data => {
+
+        let list = document.getElementById('productList');
+        list.innerHTML = '';
+
+        data.forEach(p => {
+
+            product_id_to_shop_map[p.product_id] = p.shop_id;
+
+            let card = document.createElement('div');
+            card.className = "card";
+
+            card.innerHTML = `
+                <img src="${p.image_url}">
+                <h3>${p.product_name}</h3>
+                <p>₹${p.price}</p>
+
+                <button onclick="placeOrder(${p.product_id}, ${p.price}, 'UPI')">UPI</button>
+                <button class="cod-btn" onclick="placeOrder(${p.product_id}, ${p.price}, 'COD')">COD</button>
+            `;
+
+            list.appendChild(card);
+        });
+    });
+}
+
+// =========================
+// PLACE ORDER
+// =========================
+function placeOrder(product_id, price, method) {
+
+    let address = document.getElementById('address').value;
+
+    if (!address) {
+        alert("Enter address");
+        return;
+    }
+
+    fetch('http://127.0.0.1:5000/place_order', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            user_id: userId,
+            shop_id: product_id_to_shop_map[product_id],
+            total_amount: price,
+            payment_method: method,
+            delivery_address: address,
+            items: [{
+                product_id: product_id,
+                quantity: 1,
+                price: price
+            }]
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+
+        let eta = new Date();
+        eta.setDate(eta.getDate() + 3);
+
+        window.location.href =
+        `transaction_successful.html?order_id=${data.order_id}&method=${method}&eta=${eta.toDateString()}&address=${encodeURIComponent(address)}`;
+    });
+}
+
+// =========================
+// ETA
+// =========================
+function getETA() {
+    let d = new Date();
+    d.setDate(d.getDate() + 3);
+    return d.toDateString();
+}
+
+// =========================
+// TIMELINE + PROGRESS
+// =========================
+function getTimeline(status) {
+
+    const steps = ["PENDING","ACCEPTED","OUT_FOR_DELIVERY","DELIVERED"];
+    let progress = (steps.indexOf(status)+1)/steps.length*100;
+
+    let html = `
+    <div class="progress-container">
+        <div class="progress-bar" style="width:${progress}%"></div>
+    </div>
+    <div class="timeline">`;
+
+    steps.forEach(step=>{
+        let active = steps.indexOf(step)<=steps.indexOf(status) ? "active":"";
+        let label = {
+            "PENDING":"🟡 Order Placed",
+            "ACCEPTED":"🔵 Accepted",
+            "OUT_FOR_DELIVERY":"🚚 Out for Delivery",
+            "DELIVERED":"✅ Delivered"
+        }[step];
+
+        html += `<div class="step ${active}">${label}</div>`;
+    });
+
+    html += "</div>";
+    return html;
+}
+
+// =========================
+// ORDERS
+// =========================
+function getOrders() {
+    fetch(`http://127.0.0.1:5000/user_orders/${userId}`)
+    .then(res=>res.json())
+    .then(data=>{
+
+        let list = document.getElementById('orderList');
+        list.innerHTML='';
+
+        data.forEach(o=>{
+
+            let card = document.createElement('div');
+            card.className="card";
+
+            card.innerHTML=`
+                <h3>Order #${o.order_id}</h3>
+                <p>Payment: ${o.payment_method} (${o.payment_status})</p>
+                <p>Address: ${o.delivery_address}</p>
+                <p>ETA: ${getETA()}</p>
+
+                ${getTimeline(o.order_status)}
+
+                <button onclick="trackOrder(${o.order_id})">Track</button>
+                <button onclick="showMap()">Map</button>
+            `;
+
+            list.appendChild(card);
+        });
+    });
+}
+
+// =========================
+// TRACK + NOTIFY
+// =========================
+function trackOrder(order_id){
+    fetch(`http://127.0.0.1:5000/track_order/${order_id}`)
+    .then(res=>res.json())
+    .then(data=>{
+        alert(data.order_status);
+
+        if(Notification.permission==="granted"){
+            new Notification("Order Update 🚚",{
+                body:data.order_status
+            });
+        }
+    });
+}
+
+// =========================
+// MAP
+// =========================
+function showMap(){
+    let map = new google.maps.Map(document.getElementById("mapContainer"), {
+        zoom: 14,
+        center: { lat:17.385, lng:78.4867 }
+    });
+
+    let marker = new google.maps.Marker({
+        position:{ lat:17.380, lng:78.480 },
+        map:map
+    });
+
+    let lat=17.380,lng=78.480;
+
+    setInterval(()=>{
+        lat+=0.0005; lng+=0.0005;
+        marker.setPosition({lat,lng});
+    },2000);
+}
+
+// =========================
+// LOGOUT
+// =========================
+function logout(){
+    localStorage.removeItem("user_id");
+    window.location.href="login.html";
+}
+
+</script>
+
+</body>
+</html>
